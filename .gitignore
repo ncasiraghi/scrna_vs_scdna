@@ -1,3 +1,6 @@
+# System files
+*._
+
 # History files
 .Rhistory
 .Rapp.history
