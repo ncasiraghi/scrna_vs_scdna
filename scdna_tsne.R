@@ -74,4 +74,38 @@ tsne.data = data.frame(cell_id=rownames(t(scDNAmat)), TSNE_1=tsne$Y[,1], TSNE_2=
 
 plot(x = tsne.data$TSNE_1,y = tsne.data$TSNE_2,pch=16,col=grey(.3,.6))
 
+# scDNA clustering 
+
+# k-means clustering model
+fit_cluster_kmeans <- kmeans(scale(tsne$Y), 3)  
+tsne.data$cl_kmeans <- factor(fit_cluster_kmeans$cluster)
+plot(x = tsne.data$TSNE_1,y = tsne.data$TSNE_2,pch=16,col=tsne.data$cl_kmeans)
+
+# hierarchical cluster model
+fit_cluster_hierarchical <- hclust(dist(scale(tsne$Y)))
+tsne.data$cl_hierarchical = factor(cutree(fit_cluster_hierarchical, k=3)) 
+plot(x = tsne.data$TSNE_1,y = tsne.data$TSNE_2,pch=16,col=tsne.data$cl_hierarchical)
+
+save(tsne.data, file = "scna_tsnedata.RData",compress = T)
+
+# get median cn per gene by cluster
+
+clusters <- as.character(unique(tsne.data$cl_hierarchical))
+
+agg_scDNAmat <- matrix(nrow = nrow(scDNAmat),
+                       ncol = length(clusters),
+                       data = NA,
+                       dimnames = list(rownames(scDNAmat), clusters))
+for(i in clusters){
+  cluster_barcodes <- tsne.data$cell_id[grep(tsne.data$cl_hierarchical,pattern = i)]
+  agg_scDNAmat[,i] <- apply(scDNAmat[, cluster_barcodes ],MARGIN = 1,FUN = median)
+}
+
+save(agg_scDNAmat,file = "agg_scDNAmat.RData",compress = T)
+
+# heatmap and color by cluster
+
+
+
+
 
