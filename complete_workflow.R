@@ -63,7 +63,7 @@ for(i in clusters){
   agg_scDNAmat[,i] <- apply(scDNAmat[, cluster_barcodes ],MARGIN = 1,FUN = median)
 }
 
-boxplot( agg_scDNAmat[names(pca_dna$loading_scores[1:100]),] )
+boxplot( agg_scDNAmat[names(pca_dna$loading_scores[1:1000]),] )
 
 ###############
 ## scRNA data
@@ -77,53 +77,83 @@ MatCounts <- read_filt_feature_bc_matrix(filtered_feature_bc_matrix = filtered_f
 # load QC-pass clustering [ keep normal cells ] 
 load("Seurat.objects.all.four.samples.RData")
 
-meta.data <- seu.objects.list$sample1PrimaryNuclei@meta.data
+head( seu.objects.list$sample1PrimaryNuclei@reductions$tsne@cell.embeddings )
+head( seu.objects.list$sample1PrimaryNuclei@meta.data )
 
-keep_barcodes <- paste0(rownames(meta.data),"-1")
+meta.data <- merge(x = seu.objects.list$sample1PrimaryNuclei@meta.data,
+                   y = seu.objects.list$sample1PrimaryNuclei@reductions$tsne@cell.embeddings,
+                   by = "row.names",all.x = T)
+
+rownames(meta.data) <- paste0(meta.data$Row.names,"-1")
+meta.data <- meta.data[,-1]
+meta.data$cell_id <- rownames(meta.data)
+
+head( meta.data )
 
 nrm_counts <- MatCounts$nrm_counts
-nrm_counts <- nrm_counts[, intersect(keep_barcodes, colnames(nrm_counts)) ]
+nrm_counts <- nrm_counts[, intersect(rownames(meta.data), colnames(nrm_counts)) ]
 
 counts <- MatCounts$counts
-counts <- counts[,colnames(nrm_counts)]
+counts <- counts[, colnames(nrm_counts) ]
 
-# PCA
-pca_rna <- compute_pca(matdata = nrm_counts)
+plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=16,col=grey(.3,.1))
+plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=16,col=meta.data$RNA_snn_res.0.6)
 
-plot(x = pca_rna$pca.data$PCA_1,pca_rna$pca.data$PCA_2,pch=16,col=grey(.3,.6))
+# different approach to check within cluster expression and cn
 
-# tSNE
-set.seed(9)
-tsne_rna <- compute_tsne(matdata = nrm_counts)
+head( agg_scDNAmat )
 
-plot(x = tsne_rna$TSNE_1,y = tsne_rna$TSNE_2,pch=16,col=grey(.3,.6))
+nrm_counts <- nrm_counts + 1
+nrm_counts <- t(t(nrm_counts) / apply(nrm_counts,MARGIN = 1,FUN = median ))
 
-# scRNA clustering
+gene.name_list <- rownames( agg_scDNAmat[names(pca_dna$loading_scores)[1:50],] )
 
-n.clusters <- 10
+par(pty="s",mfrow=c(1,2))
+for(gene.name in gene.name_list){
+  brPal <- colorRampPalette(c('grey','red'))
+  if( gene.name %in% rownames(nrm_counts) ){
+    message(gene.name)
+    col <- data.frame(value=nrm_counts[gene.name,],
+                      color=brPal(10)[as.numeric(cut(nrm_counts[gene.name,],breaks = 10))],
+                      stringsAsFactors = F)
+    df <- merge(x = meta.data,y = col,by = "row.names",all = F)
+    boxplot(value~RNA_snn_res.0.6,data = df,varwidth=T,outline=T)
+    plot(x = df$tSNE_1,y = df$tSNE_2,pch=19,col=paste(df$color, "80", sep=""),main = gene.name)
+  }
+}
 
-# hierarchical cluster model
-fit_cluster_hierarchical <- hclust(dist(scale(tsne_rna[,2:3])))
-tsne_rna$cl_hierarchical = cutree(fit_cluster_hierarchical, k=n.clusters)
-plot(x = tsne_rna$TSNE_1,y = tsne_rna$TSNE_2,pch=16,col=adjustcolor(tsne_rna$cl_hierarchical,.6))
+# # tSNE
+# set.seed(9)
+# tsne_rna <- compute_tsne(matdata = nrm_counts)
+# 
+# plot(x = tsne_rna$TSNE_1,y = tsne_rna$TSNE_2,pch=16,col=grey(.3,.6))
+# 
+# # scRNA clustering
+# 
+# n.clusters <- 10
+# 
+# # hierarchical cluster model
+# fit_cluster_hierarchical <- hclust(dist(scale(tsne_rna[,2:3])))
+# tsne_rna$cl_hierarchical = cutree(fit_cluster_hierarchical, k=n.clusters)
+# plot(x = tsne_rna$TSNE_1,y = tsne_rna$TSNE_2,pch=16,col=adjustcolor(tsne_rna$cl_hierarchical,.6))
 
 # aggregate UMI counts by clusters
 
-clusters <- as.character(unique(tsne_rna$cl_hierarchical))
+clusters <- as.character(unique(meta.data$RNA_snn_res.0.6))
 
-agg_nrm_counts <- matrix(nrow = nrow(nrm_counts),
+agg_nrm_counts <- matrix(nrow = nrow(counts),
                          ncol = length(clusters),
                          data = NA,
-                         dimnames = list(rownames(nrm_counts), clusters))
+                         dimnames = list(rownames(counts), clusters))
 
 for(i in clusters){
-  cluster_barcodes <- tsne_rna$cell_id[grep(tsne_rna$cl_hierarchical,pattern = i)]
-  agg_nrm_counts[,i] <- rowSums(counts[, cluster_barcodes ])
+  cluster_barcodes <- meta.data$cell_id[grep(meta.data$RNA_snn_res.0.6,pattern = i)]
+  agg_nrm_counts[,i] <- rowSums(counts[, intersect(cluster_barcodes,colnames(counts)) ])
 }
 
 agg_nrm_counts <- t( t(agg_nrm_counts) / colSums(agg_nrm_counts) )
 
-save(agg_nrm_counts, agg_scDNAmat,file = "agg_rna_dna_matrices.RData",compress = T)
+save(pca_dna, agg_nrm_counts, agg_scDNAmat,file = "agg_rna_dna_matrices.RData",compress = T)
 
 ###########################
 # compare scDNA vs scRNA
@@ -133,12 +163,10 @@ load("agg_rna_dna_matrices.RData")
 dim(agg_nrm_counts)
 dim(agg_scDNAmat)
 
-loading_scores_genes <- names(pca_dna$loading_scores)
+loading_scores_genes <- names(pca_dna$loading_scores)[1:1000]
 
-agg_scDNAmat <- agg_scDNAmat[loading_scores_genes,]
-
-keep <- intersect(rownames(agg_nrm_counts), loading_scores_genes[1:100] )
-agg_nrm_counts <- agg_nrm_counts[keep,]
+agg_scDNAmat <- agg_scDNAmat[ loading_scores_genes ,]
+agg_nrm_counts <- agg_nrm_counts[intersect(rownames(agg_nrm_counts), loading_scores_genes ),]
 
 common.genes <- intersect(rownames(agg_nrm_counts), rownames(agg_scDNAmat) )
 agg_scDNAmat <- agg_scDNAmat[common.genes,]
@@ -159,15 +187,39 @@ for(i in 1:ncol(agg_nrm_counts)){
   matR[i,] <- unlist(out)
 }
 
+rownames(matR) <- colnames(agg_nrm_counts)
+colnames(matR) <- colnames(agg_scDNAmat)
+
 my_palette <- colorRampPalette(c("white", "forestgreen"))(n = 50)
 
 library(gplots)
 heatmap.2(matR,
+          trace="none",
           scale="none",
-          col=my_palette,trace="none",
-          dendrogram = "both",
+          col=my_palette,
+          dendrogram = "none",
           labCol=FALSE,labRow = FALSE)
 
+# assign rna to cluster
+mat_data_max <- matrix(nrow = nrow(matR),ncol = ncol(matR),data = 0)
+mat_data_max[ cbind(seq(nrow(mat_data_max)), apply(matR,MARGIN = 1,FUN = which.max)) ] <- 1
+
+my_palette <- colorRampPalette(c("white", "black"))(n = 2)
+heatmap.2(mat_data_max,
+          scale="none",
+          col=my_palette,trace="none",
+          dendrogram = "column",
+          labCol=FALSE,labRow = FALSE)
+
+# plot to tSNE
+meta.data$cl_based_on_cn <- NA
+for(i in 1:nrow(meta.data)){
+  tsnecluster <- as.character( meta.data$RNA_snn_res.0.6[i] )
+  meta.data$cl_based_on_cn[i] <- colnames(matR)[which.max(matR[tsnecluster,])]
+}
+
+table(meta.data$cl_based_on_cn)
+plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=19,col=meta.data$cl_based_on_cn)
 
 
 

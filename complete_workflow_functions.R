@@ -2,7 +2,7 @@ library( data.table )
 library( Rtsne )
 library( parallel )
 
-loadCells <- function(j,cellids, max.cn = 10){
+loadCells <- function(j,cellids, max.cn = Inf){
   cellRaw <- fread(cellids[j],header = F,stringsAsFactors = F,data.table = F,select = c(5,9),colClasses=list(character=5,numeric=9))
   cell <- as.numeric(cellRaw[,2])
   names(cell) <- cellRaw[,1]
