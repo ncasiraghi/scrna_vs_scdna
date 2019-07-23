@@ -1,6 +1,8 @@
 library( data.table )
 library( Rtsne )
 library( parallel )
+library( tidyverse )
+library( Matrix )
 
 loadCells <- function(j,cellids, max.cn = Inf){
   cellRaw <- fread(cellids[j],header = F,stringsAsFactors = F,data.table = F,select = c(5,9),colClasses=list(character=5,numeric=9))

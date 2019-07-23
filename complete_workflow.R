@@ -48,7 +48,12 @@ plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=grey(.3,.6))
 # hierarchical cluster model
 fit_cluster_hierarchical <- hclust(dist(scale(tsne_dna[,2:3])))
 tsne_dna$cl_hierarchical = factor(cutree(fit_cluster_hierarchical, k=3)) 
-plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=tsne_dna$cl_hierarchical)
+
+par(pty='s',mfrow=c(1,2))
+
+colDNA <- c("black","red","green")
+names(colDNA) <- 1:3
+plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=colDNA[tsne_dna$cl_hierarchical])
 
 # get median cn per gene by cluster
 
@@ -63,7 +68,7 @@ for(i in clusters){
   agg_scDNAmat[,i] <- apply(scDNAmat[, cluster_barcodes ],MARGIN = 1,FUN = median)
 }
 
-boxplot( agg_scDNAmat[names(pca_dna$loading_scores[1:1000]),] )
+boxplot(agg_scDNAmat[names(pca_dna$loading_scores[1:1000]),],outline=F,ylab="Median Gene Copy Number")
 
 ###############
 ## scRNA data
@@ -96,8 +101,10 @@ nrm_counts <- nrm_counts[, intersect(rownames(meta.data), colnames(nrm_counts)) 
 counts <- MatCounts$counts
 counts <- counts[, colnames(nrm_counts) ]
 
+col <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6')
+names(col) <- 0:8
 plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=16,col=grey(.3,.1))
-plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=16,col=meta.data$RNA_snn_res.0.6)
+plot(x = meta.data$tSNE_1,y = meta.data$tSNE_2,pch=21,bg=col[meta.data$RNA_snn_res.0.6],col="black",lwd=.5)
 
 # different approach to check within cluster expression and cn
 
@@ -153,7 +160,7 @@ for(i in clusters){
 
 agg_nrm_counts <- t( t(agg_nrm_counts) / colSums(agg_nrm_counts) )
 
-save(pca_dna, agg_nrm_counts, agg_scDNAmat,file = "agg_rna_dna_matrices.RData",compress = T)
+#save(pca_dna, agg_nrm_counts, agg_scDNAmat,file = "agg_rna_dna_matrices.RData",compress = T)
 
 ###########################
 # compare scDNA vs scRNA
@@ -192,12 +199,16 @@ colnames(matR) <- colnames(agg_scDNAmat)
 
 my_palette <- colorRampPalette(c("white", "forestgreen"))(n = 50)
 
+RowSideColors <- col[rownames(matR)]
+ColSideColors <- colDNA[colnames(matR)]
 library(gplots)
 heatmap.2(matR,
+          ColSideColors = ColSideColors,
+          RowSideColors = RowSideColors,
           trace="none",
           scale="none",
           col=my_palette,
-          dendrogram = "none",
+          dendrogram = "both",
           labCol=FALSE,labRow = FALSE)
 
 # assign rna to cluster

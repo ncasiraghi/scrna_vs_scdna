@@ -1,3 +1,5 @@
+*.pdf
+outs/
 # System files
 ._*
 
