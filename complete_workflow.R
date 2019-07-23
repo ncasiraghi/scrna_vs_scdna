@@ -23,7 +23,7 @@ colnames(scDNAmat) <- gsub(basename(cellids),pattern = "intcellids_|-genemodel.s
 rm(ListCells)
 
 # clean dna data
-load("/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_cn_10x/dna/check_gained_genes/masterDFgenemodel_diploid_annotation.Rdata")
+load("/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_cn_10x/dna/check_gained_genes/masterDFgenemodel_diploid_annotation_sample1.Rdata")
 
 keep <- as.character(master$id[which(master$flag10x_is.noisy == 0 & master$loss < .5)])
 
@@ -41,7 +41,8 @@ plot(x = pca_dna$pca.data$PCA_1,pca_dna$pca.data$PCA_2,pch=16,col=grey(.3,.6))
 set.seed(9)
 tsne_dna <- compute_tsne(matdata = scDNAmat)
 
-plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=grey(.3,.6))
+par(pty='s')
+plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=grey(.3,.6),main = paste('n. cells: ',nrow(tsne_dna)))
 
 # scDNA clustering 
 
@@ -54,6 +55,15 @@ par(pty='s',mfrow=c(1,2))
 colDNA <- c("black","red","green")
 names(colDNA) <- 1:3
 plot(x = tsne_dna$TSNE_1,y = tsne_dna$TSNE_2,pch=16,col=colDNA[tsne_dna$cl_hierarchical])
+
+# assign cell-barcode to cell-id
+per_cell_summary_metrics <- '/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/data/10xCNV/sample1-CNV/outs/per_cell_summary_metrics.csv'
+
+barcodes_tab <- read.delim(per_cell_summary_metrics,header = T,as.is = T,stringsAsFactors = F,sep = ',')
+
+scDNA_clustering_info <- merge(x = tsne_dna,y = barcodes_tab,by = 'cell_id',all.x = T)
+
+write.table(scDNA_clustering_info,file = 'outs/Sample1_scDNA_clustering_info.tsv',col.names = T,row.names = F,quote = F,sep = '\t')
 
 # get median cn per gene by cluster
 
@@ -70,7 +80,13 @@ for(i in clusters){
 
 boxplot(agg_scDNAmat[names(pca_dna$loading_scores[1:1000]),],outline=F,ylab="Median Gene Copy Number")
 
-###############
+agg_scDNA_table <- as.data.frame(agg_scDNAmat,stringsAsFactors = F)
+agg_scDNA_table <- cbind(rownames(agg_scDNA_table),agg_scDNA_table)
+colnames(agg_scDNA_table)[1] <- 'gene_id'
+
+write.table(agg_scDNA_table,file = 'outs/Sample1_scDNA_medianCN_clusters.tsv',col.names = T,row.names = F,quote = F,sep = '\t')
+
+######################################################################################################################################################
 ## scRNA data
 
 filtered_feature_bc_matrix <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/data/10XRNA5P/sample1PrimaryNuclei/outs/filtered_feature_bc_matrix/"
