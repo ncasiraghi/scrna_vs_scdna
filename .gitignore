@@ -1,5 +1,6 @@
 *.pdf
 outs/
+inputs/
 # System files
 ._*
 

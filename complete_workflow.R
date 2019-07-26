@@ -84,7 +84,15 @@ agg_scDNA_table <- as.data.frame(agg_scDNAmat,stringsAsFactors = F)
 agg_scDNA_table <- cbind(rownames(agg_scDNA_table),agg_scDNA_table)
 colnames(agg_scDNA_table)[1] <- 'gene_id'
 
+# add info on pca loading scores
+pca_loading_scores <- data.frame(gene_id=names(pca_dna$loading_scores),
+                                 loading_scores=as.numeric(pca_dna$loading_scores),
+                                 stringsAsFactors = F)
+
+agg_scDNA_table <- merge(x = agg_scDNA_table,y = pca_loading_scores,by = 'gene_id',all.x = T)
+
 write.table(agg_scDNA_table,file = 'outs/Sample1_scDNA_medianCN_clusters.tsv',col.names = T,row.names = F,quote = F,sep = '\t')
+
 
 ######################################################################################################################################################
 ## scRNA data
